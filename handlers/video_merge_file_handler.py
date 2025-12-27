@@ -35,7 +35,8 @@ async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAUL
         if metadata.duration == 0:
             await update.message.reply_text(
                 "❌ Invalid video file or unable to detect duration.\n\n"
-                "Please send a valid video file."
+                "Please send a valid video file.",
+                reply_to_message_id=update.message.message_id
             )
             file_manager.delete_file(file_path)
             return
@@ -50,7 +51,8 @@ async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAUL
                 f"📊 Size: {metadata.size / (1024*1024):.1f} MB\n"
                 f"🎬 Resolution: {metadata.resolution[0]}x{metadata.resolution[1]}\n\n"
                 f"📂 Queue: {len(queue.videos)} videos\n"
-                f"💾 Total: {queue.get_total_size():.2f} GB"
+                f"💾 Total: {queue.get_total_size():.2f} GB",
+                reply_to_message_id=update.message.message_id
             )
             
             # Show updated merge menu
@@ -58,11 +60,15 @@ async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAUL
         else:
             await update.message.reply_text(
                 "❌ Could not add video to queue.\n"
-                "Check file validity or queue size limit (max 20)."
+                "Check file validity or queue size limit (max 20).",
+                reply_to_message_id=update.message.message_id
             )
             file_manager.delete_file(file_path)
     
     except Exception as e:
         logger.error(f"Error handling merge video upload: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text(
+            f"❌ Error: {str(e)}",
+            reply_to_message_id=update.message.message_id
+        )
         file_manager.delete_file(file_path)
