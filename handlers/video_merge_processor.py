@@ -337,13 +337,36 @@ async def _upload_to_rclone(context, user_id, filepath, queue, start_time, statu
         
         await status_msg.edit_text(
             text="☁️ UPLOADING TO RCLONE\n━━━━━━━━━━━━━━━━━━\n\n"
-                 "⏳ Connecting to drive...\n"
+                 "⏳ Initializing rclone...\n"
                  "📊 Progress: 10%"
         )
         
-        # Call rclone upload
-        await rclone_driver(status_msg, user_id, filepath)
+        # Call rclone upload with proper error handling
+        result = await rclone_driver(status_msg, user_id, filepath)
         
+        if result.get("success"):
+            # Update final message with completion info
+            try:
+                await status_msg.edit_text(
+                    text=f"✅ MERGE & UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
+                         f"📁 File: {os.path.basename(filepath)}\n"
+                         f"☁️ Remote: {result.get('remote', 'Unknown')}\n"
+                         f"⏱️ Total time: {int(time.time() - start_time)}s"
+                )
+            except:
+                pass
+        else:
+            logger.error(f"Rclone upload failed: {result.get('error', 'Unknown error')}")
+            await status_msg.edit_text(
+                f"❌ Rclone upload failed:\n{result.get('error', 'Unknown error')}"
+            )
+        
+    except ImportError as e:
+        logger.error(f"Rclone module import error: {e}")
+        await status_msg.edit_text(
+            "❌ Rclone handler not found.\n"
+            "Please ensure rclone is properly configured."
+        )
     except Exception as e:
-        logger.error(f"Rclone upload error: {e}")
+        logger.error(f"Rclone upload error: {e}", exc_info=True)
         await status_msg.edit_text(f"❌ Rclone upload failed: {str(e)}")
