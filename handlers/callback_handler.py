@@ -7,8 +7,6 @@ from keyboards.main_keyboard import (
     get_video_tools_keyboard,
     get_audio_tools_keyboard,
     get_upload_mode_keyboard,
-    get_telegram_format_keyboard,
-    get_settings_keyboard,
     get_back_close_keyboard,
 )
 
@@ -39,13 +37,26 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             logger.info(f"User {update.effective_user.id} closed menu")
         except Exception as e:
             logger.error(f"Error deleting message: {e}")
-            # Fallback: edit to show closed message
             await query.edit_message_text(text="✅ Menu closed. Type /start to open again.")
         return
     
     if callback_data.startswith("merge_") or callback_data == "video_merge":
         from handlers.video_merge_callbacks import handle_merge_callbacks
         await handle_merge_callbacks(update, context)
+        return
+    
+    if callback_data == "telegram_format_video" and context.user_data.get("awaiting_merge_format"):
+        context.user_data["upload_mode"]["format"] = "video"
+        context.user_data.pop("awaiting_merge_format", None)
+        from handlers.video_merge_processor import execute_smart_merge
+        await execute_smart_merge(update, context)
+        return
+    
+    if callback_data == "telegram_format_document" and context.user_data.get("awaiting_merge_format"):
+        context.user_data["upload_mode"]["format"] = "document"
+        context.user_data.pop("awaiting_merge_format", None)
+        from handlers.video_merge_processor import execute_smart_merge
+        await execute_smart_merge(update, context)
         return
     
     # MAIN MENU NAVIGATION
@@ -78,6 +89,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         logger.info(f"User {update.effective_user.id} opened Upload Mode menu")
     
     elif callback_data == "menu_settings":
+        from keyboards.main_keyboard import get_settings_keyboard
         await query.edit_message_text(
             text="⚙️ SETTINGS\n━━━━━━━━━━━━━━━━━━\nConfigure your preferences:",
             reply_markup=get_settings_keyboard(),
@@ -243,59 +255,27 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         logger.info(f"User {update.effective_user.id} selected sync subtitle operation")
     
     elif callback_data == "upload_telegram":
-        # Show format selection for Telegram
-        await query.edit_message_text(
-            text="📱 TELEGRAM UPLOAD FORMAT\n━━━━━━━━━━━━━━━━━━\n"
-                 "Choose how to upload files:\n\n"
-                 "🎥 Video: Sends as playable video file\n"
-                 "📁 Document: Sends as generic file\n\n"
-                 "Select your preferred format:",
-            reply_markup=get_telegram_format_keyboard(),
-        )
-        logger.info(f"User {update.effective_user.id} viewing Telegram format options")
-    
-    elif callback_data == "telegram_format_video":
         context.user_data["upload_mode"] = {
-            "engine": "telegram",
-            "format": "video"
+            "engine": "telegram"
         }
         await query.edit_message_text(
-            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
-                 "Engine: 📱 Telegram\n"
-                 "Format: 🎥 Video\n\n"
-                 "All outputs will be uploaded as video files.\n"
-                 "Now you can use any feature (merge, extract, etc.)\n\n"
-                 "Your choice is saved until /start",
+            text="✅ UPLOAD MODE SET\n━━━━━━━━━━━━━━━━━━\n"
+                 "Engine: 📱 Telegram\n\n"
+                 "Format will be selected when you start merge.\n"
+                 "Now go to VIDEO TOOLS → ➕ Video + Video to merge!",
             reply_markup=get_back_close_keyboard(),
         )
-        logger.info(f"User {update.effective_user.id} selected Telegram + Video format")
-    
-    elif callback_data == "telegram_format_document":
-        context.user_data["upload_mode"] = {
-            "engine": "telegram",
-            "format": "document"
-        }
-        await query.edit_message_text(
-            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
-                 "Engine: 📱 Telegram\n"
-                 "Format: 📁 Document\n\n"
-                 "All outputs will be uploaded as files.\n"
-                 "Now you can use any feature (merge, extract, etc.)\n\n"
-                 "Your choice is saved until /start",
-            reply_markup=get_back_close_keyboard(),
-        )
-        logger.info(f"User {update.effective_user.id} selected Telegram + Document format")
+        logger.info(f"User {update.effective_user.id} selected Telegram upload mode")
     
     elif callback_data == "upload_rclone":
         context.user_data["upload_mode"] = {
             "engine": "rclone"
         }
         await query.edit_message_text(
-            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
+            text="✅ UPLOAD MODE SET\n━━━━━━━━━━━━━━━━━━\n"
                  "Engine: ☁️ Rclone\n\n"
-                 "All outputs will be uploaded to your configured drive.\n"
-                 "Now you can use any feature (merge, extract, etc.)\n\n"
-                 "Your choice is saved until /start",
+                 "Your processed files will be uploaded to your Rclone configured drive.\n"
+                 "Now go to VIDEO TOOLS → ➕ Video + Video to merge!",
             reply_markup=get_back_close_keyboard(),
         )
         logger.info(f"User {update.effective_user.id} selected Rclone upload mode")

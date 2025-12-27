@@ -108,6 +108,11 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.warning(f"User {user_id} attempted merge without selecting upload mode")
         return
     
+    if upload_mode.get("engine") == "telegram" and "format" not in upload_mode:
+        await query.answer("❌ Please select format (Video/Document)!", show_alert=True)
+        logger.warning(f"User {user_id} attempted merge without selecting Telegram format")
+        return
+    
     if len(queue.videos) < 2:
         await query.answer("Need at least 2 videos!", show_alert=True)
         return
