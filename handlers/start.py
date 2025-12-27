@@ -16,10 +16,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         update: Telegram update object
         context: Callback context
     """
-
-    # ✅ RESET any previous operation state
-    context.user_data.clear()
-
     user = update.effective_user
 
     # ✅ Thumbnail image URL (set directly)
