@@ -49,6 +49,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"Select a category below to get started:"
     )
 
+    context.user_data.pop("upload_mode", None)
+
     # ✅ Send ONLY text (prevents edit_message_text error)
     await update.message.reply_text(
         welcome_text,

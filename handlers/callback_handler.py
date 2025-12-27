@@ -7,6 +7,7 @@ from keyboards.main_keyboard import (
     get_video_tools_keyboard,
     get_audio_tools_keyboard,
     get_upload_mode_keyboard,
+    get_telegram_format_keyboard,
     get_settings_keyboard,
     get_back_close_keyboard,
 )
@@ -241,45 +242,63 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data["operation"] = "sync_sub"
         logger.info(f"User {update.effective_user.id} selected sync subtitle operation")
     
-    # UPLOAD MODE SELECTION
     elif callback_data == "upload_telegram":
+        # Show format selection for Telegram
         await query.edit_message_text(
-            text="📱 UPLOAD MODE: TELEGRAM\n━━━━━━━━━━━━━━━━━━\n"
-                 "Upload files directly through Telegram\n\n"
-                 "✅ Maximum file size: 4GB\n"
-                 "✅ Simple and secure\n"
-                 "✅ Direct Telegram integration\n\n"
-                 "💡 Recommended for faster processing",
-            reply_markup=get_back_close_keyboard(),
+            text="📱 TELEGRAM UPLOAD FORMAT\n━━━━━━━━━━━━━━━━━━\n"
+                 "Choose how to upload files:\n\n"
+                 "🎥 Video: Sends as playable video file\n"
+                 "📁 Document: Sends as generic file\n\n"
+                 "Select your preferred format:",
+            reply_markup=get_telegram_format_keyboard(),
         )
-        context.user_data["upload_mode"] = "telegram"
-        logger.info(f"User {update.effective_user.id} selected Telegram upload mode")
+        logger.info(f"User {update.effective_user.id} viewing Telegram format options")
     
-    elif callback_data == "upload_url":
+    elif callback_data == "telegram_format_video":
+        context.user_data["upload_mode"] = {
+            "engine": "telegram",
+            "format": "video"
+        }
         await query.edit_message_text(
-            text="🔗 UPLOAD MODE: URL\n━━━━━━━━━━━━━━━━━━\n"
-                 "Provide direct URLs to files\n\n"
-                 "✅ Useful for large files\n"
-                 "✅ Access files from external sources\n"
-                 "✅ No upload speed limits\n\n"
-                 "💡 URL must be direct file link",
+            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
+                 "Engine: 📱 Telegram\n"
+                 "Format: 🎥 Video\n\n"
+                 "All outputs will be uploaded as video files.\n"
+                 "Now you can use any feature (merge, extract, etc.)\n\n"
+                 "Your choice is saved until /start",
             reply_markup=get_back_close_keyboard(),
         )
-        context.user_data["upload_mode"] = "url"
-        logger.info(f"User {update.effective_user.id} selected URL upload mode")
+        logger.info(f"User {update.effective_user.id} selected Telegram + Video format")
     
-    elif callback_data == "upload_local":
+    elif callback_data == "telegram_format_document":
+        context.user_data["upload_mode"] = {
+            "engine": "telegram",
+            "format": "document"
+        }
         await query.edit_message_text(
-            text="💾 UPLOAD MODE: LOCAL\n━━━━━━━━━━━━━━━━━━\n"
-                 "Upload from your device\n\n"
-                 "✅ Fastest processing\n"
-                 "✅ File stays on server\n"
-                 "✅ No external dependencies\n\n"
-                 "💡 Best for large files on fast connection",
+            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
+                 "Engine: 📱 Telegram\n"
+                 "Format: 📁 Document\n\n"
+                 "All outputs will be uploaded as files.\n"
+                 "Now you can use any feature (merge, extract, etc.)\n\n"
+                 "Your choice is saved until /start",
             reply_markup=get_back_close_keyboard(),
         )
-        context.user_data["upload_mode"] = "local"
-        logger.info(f"User {update.effective_user.id} selected Local upload mode")
+        logger.info(f"User {update.effective_user.id} selected Telegram + Document format")
+    
+    elif callback_data == "upload_rclone":
+        context.user_data["upload_mode"] = {
+            "engine": "rclone"
+        }
+        await query.edit_message_text(
+            text="✅ UPLOAD MODE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n"
+                 "Engine: ☁️ Rclone\n\n"
+                 "All outputs will be uploaded to your configured drive.\n"
+                 "Now you can use any feature (merge, extract, etc.)\n\n"
+                 "Your choice is saved until /start",
+            reply_markup=get_back_close_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} selected Rclone upload mode")
     
     # SETTINGS
     elif callback_data == "settings_metadata":

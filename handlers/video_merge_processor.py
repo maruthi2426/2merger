@@ -102,6 +102,12 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     queue = get_or_create_queue(user_id)
     
+    upload_mode = context.user_data.get("upload_mode")
+    if not upload_mode:
+        await query.answer("❌ Please select Upload Mode first!", show_alert=True)
+        logger.warning(f"User {user_id} attempted merge without selecting upload mode")
+        return
+    
     if len(queue.videos) < 2:
         await query.answer("Need at least 2 videos!", show_alert=True)
         return
@@ -233,32 +239,27 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
                 text="🔀 MERGING VIDEOS\n━━━━━━━━━━━━━━━━━━\n\n"
                      "✅ Stage 1: Files Ready\n"
                      "✅ Stage 2: Merge Complete\n"
-                     "⏳ Stage 3: Uploading to Telegram\n\n"
+                     "⏳ Stage 3: Uploading\n\n"
                      "📊 Progress: 95%"
             )
         except:
             pass
         
-        # Upload with progress tracking
-        upload_start = time.time()
-        with open(output_file, 'rb') as f:
-            await context.bot.send_document(
-                chat_id=user_id,
-                document=f,
-                caption=f"✅ MERGE COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                        f"📹 merged_video.mp4\n"
-                        f"📁 Size: {file_size_mb:.2f}MB\n"
-                        f"⏱️ Duration: {queue._format_duration(queue.get_total_duration())}\n\n"
-                        f"⏲️ Processing time: {int(time.time() - start_time)}s"
+        upload_engine = upload_mode.get("engine", "telegram")
+        
+        if upload_engine == "telegram":
+            upload_as_document = upload_mode.get("format") == "document"
+            await _upload_to_telegram(
+                context, user_id, output_file, file_size_mb, 
+                queue, start_time, status_msg, upload_as_document
             )
-        
-        upload_time = time.time() - upload_start
-        upload_speed = (file_size_mb / upload_time) if upload_time > 0 else 0
-        
-        try:
-            await status_msg.delete()
-        except:
-            pass
+        elif upload_engine == "rclone":
+            await _upload_to_rclone(
+                context, user_id, output_file, queue, start_time, status_msg
+            )
+        else:
+            logger.error(f"Unknown upload engine: {upload_engine}")
+            await status_msg.edit_text("❌ Invalid upload mode configured")
         
         # Cleanup
         queue.clear_all()
@@ -291,3 +292,53 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
                 os.remove(output_file)
         except:
             pass
+
+
+async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, start_time, status_msg, upload_as_document):
+    """Upload file to Telegram using selected format (video or document)."""
+    try:
+        with open(filepath, 'rb') as f:
+            if upload_as_document:
+                await context.bot.send_document(
+                    chat_id=user_id,
+                    document=f,
+                    caption=f"✅ MERGE COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
+                            f"📁 merged_video.mp4\n"
+                            f"📊 Size: {file_size_mb:.2f}MB\n"
+                            f"⏱️ Duration: {queue._format_duration(queue.get_total_duration())}\n\n"
+                            f"⏲️ Processing time: {int(time.time() - start_time)}s"
+                )
+            else:
+                await context.bot.send_video(
+                    chat_id=user_id,
+                    video=f,
+                    caption=f"✅ MERGE COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
+                            f"📹 merged_video.mp4\n"
+                            f"📊 Size: {file_size_mb:.2f}MB\n"
+                            f"⏱️ Duration: {queue._format_duration(queue.get_total_duration())}\n\n"
+                            f"⏲️ Processing time: {int(time.time() - start_time)}s"
+                )
+        
+        await status_msg.delete()
+    except Exception as e:
+        logger.error(f"Telegram upload error: {e}")
+        raise
+
+
+async def _upload_to_rclone(context, user_id, filepath, queue, start_time, status_msg):
+    """Upload file to Rclone configured drive."""
+    try:
+        from handlers.rclone_upload import rclone_driver
+        
+        await status_msg.edit_text(
+            text="☁️ UPLOADING TO RCLONE\n━━━━━━━━━━━━━━━━━━\n\n"
+                 "⏳ Connecting to drive...\n"
+                 "📊 Progress: 10%"
+        )
+        
+        # Call rclone upload
+        await rclone_driver(status_msg, user_id, filepath)
+        
+    except Exception as e:
+        logger.error(f"Rclone upload error: {e}")
+        await status_msg.edit_text(f"❌ Rclone upload failed: {str(e)}")

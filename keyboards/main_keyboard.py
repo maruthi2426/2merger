@@ -103,15 +103,33 @@ def get_upload_mode_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton("📱 Telegram Upload", callback_data="upload_telegram"),
-            InlineKeyboardButton("🔗 URL Upload", callback_data="upload_url"),
-        ],
-        [
-            InlineKeyboardButton("💾 Local File", callback_data="upload_local"),
+            InlineKeyboardButton("☁️ Rclone Upload", callback_data="upload_rclone"),
         ],
         # Row with Back and Close buttons
         [
             InlineKeyboardButton("🔙 Back", callback_data="back_main"),
             InlineKeyboardButton("❌ Close", callback_data="close"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_telegram_format_keyboard() -> InlineKeyboardMarkup:
+    """
+    Create Telegram upload format selection keyboard.
+    Choose between Video or Document format.
+    
+    Returns:
+        InlineKeyboardMarkup: Format options for Telegram upload
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton("🎥 Video Format", callback_data="telegram_format_video"),
+            InlineKeyboardButton("📁 Document Format", callback_data="telegram_format_document"),
+        ],
+        # Row with Back button
+        [
+            InlineKeyboardButton("🔙 Back", callback_data="menu_upload_mode"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
