@@ -335,13 +335,6 @@ async def _upload_to_rclone(context, user_id, filepath, queue, start_time, statu
     try:
         from handlers.rclone_upload import rclone_driver
         
-        await status_msg.edit_text(
-            text="☁️ UPLOADING TO RCLONE\n━━━━━━━━━━━━━━━━━━\n\n"
-                 "⏳ Initializing rclone...\n"
-                 "📊 Progress: 10%"
-        )
-        
-        # Call rclone upload with proper error handling
         result = await rclone_driver(status_msg, user_id, filepath)
         
         if result.get("success"):
@@ -351,22 +344,35 @@ async def _upload_to_rclone(context, user_id, filepath, queue, start_time, statu
                     text=f"✅ MERGE & UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
                          f"📁 File: {os.path.basename(filepath)}\n"
                          f"☁️ Remote: {result.get('remote', 'Unknown')}\n"
+                         f"📊 Size: {os.path.getsize(filepath)/(1024*1024):.2f}MB\n"
                          f"⏱️ Total time: {int(time.time() - start_time)}s"
                 )
             except:
                 pass
+            
+            logger.info(f"Rclone upload successful for user {user_id}")
         else:
-            logger.error(f"Rclone upload failed: {result.get('error', 'Unknown error')}")
-            await status_msg.edit_text(
-                f"❌ Rclone upload failed:\n{result.get('error', 'Unknown error')}"
-            )
+            error_msg = result.get('error', 'Unknown error')
+            logger.error(f"Rclone upload failed: {error_msg}")
+            try:
+                await status_msg.edit_text(
+                    f"❌ Rclone upload failed:\n{error_msg}"
+                )
+            except:
+                pass
         
     except ImportError as e:
         logger.error(f"Rclone module import error: {e}")
-        await status_msg.edit_text(
-            "❌ Rclone handler not found.\n"
-            "Please ensure rclone is properly configured."
-        )
+        try:
+            await status_msg.edit_text(
+                "❌ Rclone handler not found.\n"
+                "Please ensure rclone module is installed."
+            )
+        except:
+            pass
     except Exception as e:
         logger.error(f"Rclone upload error: {e}", exc_info=True)
-        await status_msg.edit_text(f"❌ Rclone upload failed: {str(e)}")
+        try:
+            await status_msg.edit_text(f"❌ Rclone upload failed: {str(e)}")
+        except:
+            pass

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle all inline keyboard button callbacks.
-    Added close button functionality and improved back button navigation
+    Simplified upload mode selection and fixed mode persistence
     
     Args:
         update: Telegram update object
@@ -63,7 +63,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     if callback_data == "back_main":
         await query.edit_message_text(
             text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
-            reply_markup=get_main_keyboard(),
+            reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
         )
         logger.info(f"User {update.effective_user.id} returned to main menu")
     
@@ -83,18 +83,10 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     elif callback_data == "menu_upload_mode":
         await query.edit_message_text(
-            text="📤 UPLOAD MODE\n━━━━━━━━━━━━━━━━━━\nSelect your preferred method:",
-            reply_markup=get_upload_mode_keyboard(),
+            text="📤 UPLOAD MODE\n━━━━━━━━━━━━━━━━━━\nSelect your preferred upload method:",
+            reply_markup=get_upload_mode_keyboard(context.user_data.get("upload_mode")),
         )
         logger.info(f"User {update.effective_user.id} opened Upload Mode menu")
-    
-    elif callback_data == "menu_settings":
-        from keyboards.main_keyboard import get_settings_keyboard
-        await query.edit_message_text(
-            text="⚙️ SETTINGS\n━━━━━━━━━━━━━━━━━━\nConfigure your preferences:",
-            reply_markup=get_settings_keyboard(),
-        )
-        logger.info(f"User {update.effective_user.id} opened Settings menu")
     
     # VIDEO TOOLS OPERATIONS
     elif callback_data == "video_extract":
@@ -256,29 +248,49 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     elif callback_data == "upload_telegram":
         context.user_data["upload_mode"] = {
-            "engine": "telegram"
+            "engine": "telegram",
+            "format": "video"  # Default format
         }
+        
         await query.edit_message_text(
-            text="✅ UPLOAD MODE SET\n━━━━━━━━━━━━━━━━━━\n"
-                 "Engine: 📱 Telegram\n\n"
-                 "Format will be selected when you start merge.\n"
-                 "Now go to VIDEO TOOLS → ➕ Video + Video to merge!",
-            reply_markup=get_back_close_keyboard(),
+            text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
+            reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
         )
         logger.info(f"User {update.effective_user.id} selected Telegram upload mode")
     
     elif callback_data == "upload_rclone":
-        context.user_data["upload_mode"] = {
-            "engine": "rclone"
-        }
-        await query.edit_message_text(
-            text="✅ UPLOAD MODE SET\n━━━━━━━━━━━━━━━━━━\n"
-                 "Engine: ☁️ Rclone\n\n"
-                 "Your processed files will be uploaded to your Rclone configured drive.\n"
-                 "Now go to VIDEO TOOLS → ➕ Video + Video to merge!",
-            reply_markup=get_back_close_keyboard(),
-        )
-        logger.info(f"User {update.effective_user.id} selected Rclone upload mode")
+        # If no config, ask user to upload rclone.conf file
+        user_id = update.effective_user.id
+        import os
+        conf_path = f"./userdata/{user_id}/rclone.conf"
+        
+        if os.path.exists(conf_path):
+            # Config exists, set rclone mode
+            context.user_data["upload_mode"] = {
+                "engine": "rclone",
+                "configured": True
+            }
+            logger.info(f"User {user_id} selected Rclone upload mode (config found)")
+            
+            await query.edit_message_text(
+                text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
+                reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
+            )
+        else:
+            # No config, ask user to upload
+            context.user_data["awaiting_rclone_config"] = True
+            
+            await query.edit_message_text(
+                text="☁️ RCLONE SETUP REQUIRED\n━━━━━━━━━━━━━━━━━━\n\n"
+                     "To use Rclone upload, send your rclone.conf file.\n\n"
+                     "📋 How to get rclone.conf:\n"
+                     "1. Configure rclone: rclone config\n"
+                     "2. Find config at ~/.config/rclone/rclone.conf\n"
+                     "3. Send the file here\n\n"
+                     "Once uploaded, Rclone mode will be automatically enabled.",
+                reply_markup=get_back_close_keyboard(),
+            )
+            logger.info(f"User {user_id} clicked Rclone but no config found - requesting config file")
     
     # SETTINGS
     elif callback_data == "settings_metadata":

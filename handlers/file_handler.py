@@ -1,3 +1,4 @@
+"""Handle file uploads including rclone config file detection."""
 import logging
 import os
 from telegram import Update
@@ -19,11 +20,82 @@ processor = FFmpegProcessor()
 async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all file uploads and process based on operation."""
     try:
+        user_id = update.effective_user.id
+        
+        if context.user_data.get("awaiting_rclone_config"):
+            file = update.message.document
+            if not file:
+                await update.message.reply_text(
+                    "❌ Please send a file (not a photo or video)",
+                    reply_to_message_id=update.message.message_id
+                )
+                return
+            
+            filename = file.file_name or "rclone.conf"
+            
+            # Only accept .conf files
+            if not filename.endswith(".conf"):
+                await update.message.reply_text(
+                    "❌ Invalid file! Please send the rclone.conf file only",
+                    reply_to_message_id=update.message.message_id
+                )
+                return
+            
+            # Create userdata directory
+            user_dir = f"./userdata/{user_id}"
+            os.makedirs(user_dir, exist_ok=True)
+            
+            # Save the config file
+            conf_path = os.path.join(user_dir, "rclone.conf")
+            file_obj = await context.bot.get_file(file.file_id)
+            await file_obj.download_to_drive(conf_path)
+            
+            # Validate rclone config
+            try:
+                with open(conf_path, 'r') as f:
+                    content = f.read()
+                    if '[' not in content or ']' not in content:
+                        raise ValueError("Invalid rclone config format")
+                
+                # Config is valid, set rclone mode
+                context.user_data["upload_mode"] = {
+                    "engine": "rclone",
+                    "configured": True
+                }
+                context.user_data.pop("awaiting_rclone_config", None)
+                
+                # Get first remote name from config
+                import re
+                match = re.search(r'\[([^\]]+)\]', content)
+                remote_name = match.group(1) if match else "unknown"
+                
+                await update.message.reply_text(
+                    f"✅ RCLONE CONFIG RECEIVED!\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ Rclone mode enabled\n"
+                    f"Remote: {remote_name}\n\n"
+                    f"You can now use Rclone upload for your files!\n"
+                    f"Type /start to go to main menu.",
+                    reply_to_message_id=update.message.message_id
+                )
+                logger.info(f"User {user_id} successfully uploaded rclone.conf with remote: {remote_name}")
+                return
+            except Exception as e:
+                logger.error(f"Invalid rclone config from user {user_id}: {e}")
+                await update.message.reply_text(
+                    f"❌ Invalid rclone config file!\n\n"
+                    f"Error: {str(e)}\n\n"
+                    f"Please send a valid rclone.conf file",
+                    reply_to_message_id=update.message.message_id
+                )
+                os.remove(conf_path)
+                return
+        
         operation = context.user_data.get("operation")
         
         if not operation:
             await update.message.reply_text(
-                "❌ No operation selected. Use /merge, /extract, /trim, /convert, /compress, /swap_audio, /combine, /watermark, /subtitle, /remove_stream, /sync_sub, or /rename",
+                "❌ No operation selected. Use /start to choose an operation",
                 reply_to_message_id=update.message.message_id
             )
             return
@@ -41,18 +113,15 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         file_manager.create_temp_folder()
         
         if operation in ["merge", "merge_add"]:
-            # Send download progress message - reply to the video message
             download_msg = await update.message.reply_text(
                 "📥 Downloading video...\n"
                 "Progress: 0%",
                 reply_to_message_id=update.message.message_id
             )
             
-            # Download file
             await file_obj.download_to_drive(filepath)
             file_size = file_manager.get_file_size(filepath) / (1024*1024)
             
-            # Delete the download progress message and call merge processor
             try:
                 await download_msg.delete()
             except:
@@ -67,7 +136,6 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 reply_to_message_id=update.message.message_id
             )
             
-            # Store file in context for next steps
             if "files" not in context.user_data:
                 context.user_data["files"] = []
             context.user_data["files"].append(filepath)

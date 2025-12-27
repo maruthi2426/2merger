@@ -2,26 +2,31 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def get_main_keyboard() -> InlineKeyboardMarkup:
+def get_main_keyboard(current_upload_mode=None) -> InlineKeyboardMarkup:
     """
     Create main menu keyboard with categories.
-    Added close button to main menu (no back button on start page)
+    Added upload mode indicator with checkmark
     
     Returns:
         InlineKeyboardMarkup: Main menu with Video Tools, Audio Tools, Upload Mode, and Close button
     """
+    upload_text = "📤 Upload Mode"
+    if current_upload_mode:
+        engine = current_upload_mode.get("engine", "telegram")
+        if engine == "telegram":
+            upload_text = "📤 Upload Mode ✅ (Telegram)"
+        elif engine == "rclone":
+            upload_text = "📤 Upload Mode ✅ (Rclone)"
+    
     keyboard = [
-        # Row 1: Video Tools and Audio Tools
         [
             InlineKeyboardButton("🎬 Video Tools", callback_data="menu_video_tools"),
             InlineKeyboardButton("🎵 Audio Tools", callback_data="menu_audio_tools"),
         ],
-        # Row 2: Upload Mode and Extra Settings
         [
-            InlineKeyboardButton("📤 Upload Mode", callback_data="menu_upload_mode"),
+            InlineKeyboardButton(upload_text, callback_data="menu_upload_mode"),
             InlineKeyboardButton("⚙️ Extra Settings", callback_data="menu_settings"),
         ],
-        # Row 3: Close button only (no back on start page)
         [
             InlineKeyboardButton("❌ Close", callback_data="close"),
         ],
@@ -92,20 +97,27 @@ def get_audio_tools_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_upload_mode_keyboard() -> InlineKeyboardMarkup:
+def get_upload_mode_keyboard(current_mode=None) -> InlineKeyboardMarkup:
     """
-    Create upload mode selection keyboard.
-    Added close button alongside back button
+    Create upload mode selection keyboard with checkmarks for selected mode.
+    Shows which mode is currently selected
     
     Returns:
-        InlineKeyboardMarkup: Upload mode options with back/close buttons
+        InlineKeyboardMarkup: Upload mode options with selected indicator
     """
+    telegram_text = "📱 Telegram"
+    rclone_text = "☁️ Rclone"
+    
+    if current_mode and current_mode.get("engine") == "telegram":
+        telegram_text = "📱 Telegram ✅"
+    elif current_mode and current_mode.get("engine") == "rclone":
+        rclone_text = "☁️ Rclone ✅"
+    
     keyboard = [
         [
-            InlineKeyboardButton("📱 Telegram Upload", callback_data="upload_telegram"),
-            InlineKeyboardButton("☁️ Rclone Upload", callback_data="upload_rclone"),
+            InlineKeyboardButton(telegram_text, callback_data="upload_telegram"),
+            InlineKeyboardButton(rclone_text, callback_data="upload_rclone"),
         ],
-        # Row with Back and Close buttons
         [
             InlineKeyboardButton("🔙 Back", callback_data="back_main"),
             InlineKeyboardButton("❌ Close", callback_data="close"),
