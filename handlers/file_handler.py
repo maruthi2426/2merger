@@ -26,7 +26,7 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             file = update.message.document
             if not file:
                 await update.message.reply_text(
-                    "❌ Please send a file (not a photo or video)",
+                    "❌ Please send a file (document format only)",
                     reply_to_message_id=update.message.message_id
                 )
                 return
@@ -64,21 +64,16 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 }
                 context.user_data.pop("awaiting_rclone_config", None)
                 
-                # Get first remote name from config
-                import re
-                match = re.search(r'\[([^\]]+)\]', content)
-                remote_name = match.group(1) if match else "unknown"
+                logger.info(f"User {user_id} successfully uploaded rclone.conf")
+                
+                # Get main menu keyboard which will show checkmark for rclone
+                from keyboards.main_keyboard import get_main_keyboard
                 
                 await update.message.reply_text(
-                    f"✅ RCLONE CONFIG RECEIVED!\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"✅ Rclone mode enabled\n"
-                    f"Remote: {remote_name}\n\n"
-                    f"You can now use Rclone upload for your files!\n"
-                    f"Type /start to go to main menu.",
+                    "🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
+                    reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
                     reply_to_message_id=update.message.message_id
                 )
-                logger.info(f"User {user_id} successfully uploaded rclone.conf with remote: {remote_name}")
                 return
             except Exception as e:
                 logger.error(f"Invalid rclone config from user {user_id}: {e}")
@@ -100,7 +95,6 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
             return
         
-        # Get file
         file = update.message.document or update.message.video or update.message.audio
         if not file:
             return
