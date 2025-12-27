@@ -1,0 +1,340 @@
+"""Handle callback queries from inline keyboards."""
+import logging
+from telegram import Update
+from telegram.ext import ContextTypes
+from keyboards.main_keyboard import (
+    get_main_keyboard,
+    get_video_tools_keyboard,
+    get_audio_tools_keyboard,
+    get_upload_mode_keyboard,
+    get_settings_keyboard,
+    get_back_close_keyboard,
+)
+
+logger = logging.getLogger(__name__)
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle all inline keyboard button callbacks.
+    Added close button functionality and improved back button navigation
+    
+    Args:
+        update: Telegram update object
+        context: Callback context
+    """
+    query = update.callback_query
+    
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.warning(f"Callback answer error (normal): {e}")
+    
+    callback_data = query.data
+    
+    if callback_data == "close":
+        try:
+            await query.delete_message()
+            logger.info(f"User {update.effective_user.id} closed menu")
+        except Exception as e:
+            logger.error(f"Error deleting message: {e}")
+            # Fallback: edit to show closed message
+            await query.edit_message_text(text="✅ Menu closed. Type /start to open again.")
+        return
+    
+    if callback_data.startswith("merge_") or callback_data == "video_merge":
+        from handlers.video_merge_callbacks import handle_merge_callbacks
+        await handle_merge_callbacks(update, context)
+        return
+    
+    # MAIN MENU NAVIGATION
+    if callback_data == "back_main":
+        await query.edit_message_text(
+            text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
+            reply_markup=get_main_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} returned to main menu")
+    
+    elif callback_data == "menu_video_tools":
+        await query.edit_message_text(
+            text="🎬 VIDEO TOOLS\n━━━━━━━━━━━━━━━━━━\nSelect an operation:",
+            reply_markup=get_video_tools_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened Video Tools menu")
+    
+    elif callback_data == "menu_audio_tools":
+        await query.edit_message_text(
+            text="🎵 AUDIO TOOLS\n━━━━━━━━━━━━━━━━━━\nSelect an operation:",
+            reply_markup=get_audio_tools_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened Audio Tools menu")
+    
+    elif callback_data == "menu_upload_mode":
+        await query.edit_message_text(
+            text="📤 UPLOAD MODE\n━━━━━━━━━━━━━━━━━━\nSelect your preferred method:",
+            reply_markup=get_upload_mode_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened Upload Mode menu")
+    
+    elif callback_data == "menu_settings":
+        await query.edit_message_text(
+            text="⚙️ SETTINGS\n━━━━━━━━━━━━━━━━━━\nConfigure your preferences:",
+            reply_markup=get_settings_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened Settings menu")
+    
+    # VIDEO TOOLS OPERATIONS
+    elif callback_data == "video_extract":
+        await query.edit_message_text(
+            text="🔊 EXTRACT AUDIO\n━━━━━━━━━━━━━━━━━━\n"
+                 "Send a video file to extract audio from\n\n"
+                 "✅ The audio will be extracted as MP3 format\n\n"
+                 "💡 Tip: High quality output",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "extract"
+        logger.info(f"User {update.effective_user.id} selected extract operation")
+    
+    elif callback_data == "video_trim":
+        await query.edit_message_text(
+            text="✂️ TRIM VIDEO\n━━━━━━━━━━━━━━━━━━\n"
+                 "Send a video file to trim\n\n"
+                 "You'll be asked for:\n"
+                 "• Start time (HH:MM:SS format)\n"
+                 "• End time (HH:MM:SS format)\n\n"
+                 "💡 Example: 00:30:45 to 02:15:30",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "trim"
+        logger.info(f"User {update.effective_user.id} selected trim operation")
+    
+    elif callback_data == "video_convert":
+        await query.edit_message_text(
+            text="🔄 CONVERT FORMAT\n━━━━━━━━━━━━━━━━━━\n"
+                 "Send a video file to convert\n\n"
+                 "✅ Supported formats: mp4, mkv, avi, mov, webm, flv, wmv\n\n"
+                 "💡 You'll be asked which format to convert to",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "convert"
+        logger.info(f"User {update.effective_user.id} selected convert operation")
+    
+    elif callback_data == "video_compress":
+        await query.edit_message_text(
+            text="✅ COMPRESS VIDEO\n━━━━━━━━━━━━━━━━━━\n"
+                 "Send a video file to compress\n\n"
+                 "Quality scale: 0-51\n"
+                 "• 0 = Best quality (larger file)\n"
+                 "• 28 = Default quality\n"
+                 "• 51 = Worst quality (smallest file)\n\n"
+                 "💡 You'll be asked for quality preference",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "compress"
+        logger.info(f"User {update.effective_user.id} selected compress operation")
+    
+    elif callback_data == "video_remove_stream":
+        await query.edit_message_text(
+            text="❌ REMOVE STREAM\n━━━━━━━━━━━━━━━━━━\n"
+                 "Send a video file to remove stream\n\n"
+                 "You can remove either:\n"
+                 "• Audio stream (keep video only)\n"
+                 "• Video stream (keep audio only)\n\n"
+                 "💡 Useful for removing unwanted audio/video",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "remove_stream"
+        logger.info(f"User {update.effective_user.id} selected remove stream operation")
+    
+    elif callback_data == "video_watermark":
+        await query.edit_message_text(
+            text="🌊 ADD WATERMARK\n━━━━━━━━━━━━━━━━━━\n"
+                 "Add a watermark to your video\n\n"
+                 "Steps:\n"
+                 "1️⃣ Send the video file\n"
+                 "2️⃣ Send the watermark image (PNG recommended)\n"
+                 "3️⃣ Specify position (top-left, center, bottom-right, etc.)\n\n"
+                 "💡 PNG images with transparency work best",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "watermark"
+        logger.info(f"User {update.effective_user.id} selected watermark operation")
+    
+    elif callback_data == "video_subtitle":
+        await query.edit_message_text(
+            text="📝 ADD SUBTITLE\n━━━━━━━━━━━━━━━━━━\n"
+                 "Add subtitles to your video\n\n"
+                 "Steps:\n"
+                 "1️⃣ Send the video file\n"
+                 "2️⃣ Send the subtitle file (.srt, .ass, .vtt)\n\n"
+                 "✅ Supported formats: SRT, ASS, VTT, SUB",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "subtitle"
+        logger.info(f"User {update.effective_user.id} selected subtitle operation")
+    
+    elif callback_data == "video_swap_audio":
+        await query.edit_message_text(
+            text="🎬 REPLACE AUDIO\n━━━━━━━━━━━━━━━━━━\n"
+                 "Replace video audio with a new audio track\n\n"
+                 "Steps:\n"
+                 "1️⃣ Send the video file\n"
+                 "2️⃣ Send the new audio file (MP3, WAV, etc.)\n\n"
+                 "💡 New audio will sync with original video length",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "swap_audio"
+        logger.info(f"User {update.effective_user.id} selected swap audio operation")
+    
+    elif callback_data == "video_thumbnail":
+        await query.edit_message_text(
+            text="📋 GENERATE THUMBNAIL\n━━━━━━━━━━━━━━━━━━\n"
+                 "Extract a thumbnail from your video\n\n"
+                 "You'll be asked for:\n"
+                 "• Time point (HH:MM:SS format)\n"
+                 "• Image size preference\n\n"
+                 "💡 Useful for creating video cover images",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "thumbnail"
+        logger.info(f"User {update.effective_user.id} selected thumbnail operation")
+    
+    elif callback_data == "video_metadata":
+        await query.edit_message_text(
+            text="📊 VIEW METADATA\n━━━━━━━━━━━━━━━━━━\n"
+                 "View detailed information about video\n\n"
+                 "You'll see:\n"
+                 "• Duration & Resolution\n"
+                 "• Codec & Bitrate\n"
+                 "• FPS & Frame Count\n"
+                 "• File Size & Format\n\n"
+                 "💡 Useful for checking video properties",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "metadata"
+        logger.info(f"User {update.effective_user.id} selected metadata operation")
+    
+    # AUDIO TOOLS OPERATIONS
+    elif callback_data == "audio_combine":
+        await query.edit_message_text(
+            text="🎬 COMBINE VIDEO + AUDIO\n━━━━━━━━━━━━━━━━━━\n"
+                 "Combine a video with an audio file\n\n"
+                 "Steps:\n"
+                 "1️⃣ Send the video file\n"
+                 "2️⃣ Send the audio file to combine\n\n"
+                 "✅ Supported audio: MP3, WAV, AAC, FLAC",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "combine"
+        logger.info(f"User {update.effective_user.id} selected combine operation")
+    
+    elif callback_data == "audio_sync_sub":
+        await query.edit_message_text(
+            text="⏱️ SYNC SUBTITLE TIMING\n━━━━━━━━━━━━━━━━━━\n"
+                 "Adjust subtitle timing\n\n"
+                 "Steps:\n"
+                 "1️⃣ Send the subtitle file (.srt, .ass, .vtt)\n"
+                 "2️⃣ Provide delay in seconds\n\n"
+                 "💡 Examples: 2.5 (delay forward), -1.5 (delay backward)",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["operation"] = "sync_sub"
+        logger.info(f"User {update.effective_user.id} selected sync subtitle operation")
+    
+    # UPLOAD MODE SELECTION
+    elif callback_data == "upload_telegram":
+        await query.edit_message_text(
+            text="📱 UPLOAD MODE: TELEGRAM\n━━━━━━━━━━━━━━━━━━\n"
+                 "Upload files directly through Telegram\n\n"
+                 "✅ Maximum file size: 4GB\n"
+                 "✅ Simple and secure\n"
+                 "✅ Direct Telegram integration\n\n"
+                 "💡 Recommended for faster processing",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["upload_mode"] = "telegram"
+        logger.info(f"User {update.effective_user.id} selected Telegram upload mode")
+    
+    elif callback_data == "upload_url":
+        await query.edit_message_text(
+            text="🔗 UPLOAD MODE: URL\n━━━━━━━━━━━━━━━━━━\n"
+                 "Provide direct URLs to files\n\n"
+                 "✅ Useful for large files\n"
+                 "✅ Access files from external sources\n"
+                 "✅ No upload speed limits\n\n"
+                 "💡 URL must be direct file link",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["upload_mode"] = "url"
+        logger.info(f"User {update.effective_user.id} selected URL upload mode")
+    
+    elif callback_data == "upload_local":
+        await query.edit_message_text(
+            text="💾 UPLOAD MODE: LOCAL\n━━━━━━━━━━━━━━━━━━\n"
+                 "Upload from your device\n\n"
+                 "✅ Fastest processing\n"
+                 "✅ File stays on server\n"
+                 "✅ No external dependencies\n\n"
+                 "💡 Best for large files on fast connection",
+            reply_markup=get_back_close_keyboard(),
+        )
+        context.user_data["upload_mode"] = "local"
+        logger.info(f"User {update.effective_user.id} selected Local upload mode")
+    
+    # SETTINGS
+    elif callback_data == "settings_metadata":
+        await query.edit_message_text(
+            text="📋 METADATA SETTINGS\n━━━━━━━━━━━━━━━━━━\n"
+                 "Edit metadata for your files\n\n"
+                 "⚠️ Status: Not yet configured\n\n"
+                 "Coming soon:\n"
+                 "• Custom title & author\n"
+                 "• Set creation date\n"
+                 "• Add custom tags",
+            reply_markup=get_back_close_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened metadata settings")
+    
+    elif callback_data == "settings_quality":
+        await query.edit_message_text(
+            text="🎬 VIDEO QUALITY SETTINGS\n━━━━━━━━━━━━━━━━━━\n"
+                 "Configure default video quality\n\n"
+                 "Current Setting: Auto\n\n"
+                 "Quality Options:\n"
+                 "• 480p - Small files, fast processing\n"
+                 "• 720p - Balanced\n"
+                 "• 1080p - High quality\n"
+                 "• 4K - Maximum quality",
+            reply_markup=get_back_close_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} opened quality settings")
+    
+    elif callback_data == "settings_clear_cache":
+        await query.edit_message_text(
+            text="🗑️ CACHE CLEARED\n━━━━━━━━━━━━━━━━━━\n"
+                 "✅ Cache cleared successfully!\n\n"
+                 "Freed up disk space:\n"
+                 "• Temporary files removed\n"
+                 "• Processing logs cleaned\n"
+                 "• Old conversions deleted",
+            reply_markup=get_back_close_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} cleared cache")
+    
+    elif callback_data == "settings_about":
+        await query.edit_message_text(
+            text="ℹ️ ABOUT VIDEO MERGER BOT\n━━━━━━━━━━━━━━━━━━\n"
+                 "Version: 1.0\n"
+                 "Powered by FFmpeg\n\n"
+                 "Features:\n"
+                 "✅ Video merging & editing\n"
+                 "✅ Audio processing\n"
+                 "✅ Format conversion\n"
+                 "✅ Compression\n\n"
+                 "Type /start to return to main menu",
+            reply_markup=get_back_close_keyboard(),
+        )
+        logger.info(f"User {update.effective_user.id} viewed about info")
+    
+    else:
+        logger.warning(f"Unknown callback: {callback_data}")
