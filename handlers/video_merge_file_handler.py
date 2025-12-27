@@ -1,7 +1,6 @@
 """Handle file uploads for video merge operations."""
 import logging
-import os
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.file_manager import FileManager
 from handlers.video_merge_manager import (
@@ -14,23 +13,25 @@ logger = logging.getLogger(__name__)
 file_manager = FileManager()
 
 
-async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAULT_TYPE, file_path: str) -> None:
+async def handle_merge_video_upload(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    file_path: str
+) -> None:
     """Handle video file upload for merge queue."""
     user_id = update.effective_user.id
     queue = get_or_create_queue(user_id)
-    
+
     try:
-        # Get file info
         file_info = update.message.video or update.message.document
         file_name = file_info.file_name or f"video_{len(queue.videos) + 1}.mp4"
-        
-        # Create metadata
+
         metadata = VideoMetadata(
             msg_id=update.message.message_id,
             file_name=file_name,
             file_path=file_path
         )
-        
+
         # Validate video
         if metadata.duration == 0:
             await update.message.reply_text(
@@ -40,23 +41,36 @@ async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAUL
             )
             file_manager.delete_file(file_path)
             return
-        
+
         # Add to queue
         if queue.add_video(metadata):
-            # Show success with queue status
-            await update.message.reply_text(
-                f"✅ Video {len(queue.videos)} added!\n\n"
-                f"📁 File: {file_name}\n"
-                f"⏱ Duration: {VideoMetadata._format_duration(metadata.duration)}\n"
-                f"📊 Size: {metadata.size / (1024*1024):.1f} MB\n"
-                f"🎬 Resolution: {metadata.resolution[0]}x{metadata.resolution[1]}\n\n"
-                f"📂 Queue: {len(queue.videos)} videos\n"
-                f"💾 Total: {queue.get_total_size():.2f} GB",
-                reply_to_message_id=update.message.message_id
+
+            # Inline buttons instead of separate menu message
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ Add More", callback_data="merge_menu")],
+                [InlineKeyboardButton("✅ Start Merge", callback_data="merge_start_now")],
+                [InlineKeyboardButton("🗑 Clear Queue", callback_data="merge_clear")]
+            ])
+
+            # ✅ SINGLE reply attached to the video
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=(
+                    f"✅ Video {len(queue.videos)} added!\n\n"
+                    f"📁 File: {file_name}\n"
+                    f"⏱ Duration: {VideoMetadata._format_duration(metadata.duration)}\n"
+                    f"📊 Size: {metadata.size / (1024*1024):.1f} MB\n"
+                    f"🎬 Resolution: {metadata.resolution[0]}x{metadata.resolution[1]}\n\n"
+                    f"📂 Queue: {len(queue.videos)} videos\n"
+                    f"💾 Total: {queue.get_total_size():.2f} GB"
+                ),
+                reply_to_message_id=update.message.message_id,
+                reply_markup=keyboard
             )
-            
-            # Show updated merge menu
-            await show_merge_menu(update, context, edit=False)
+
+            # 🔕 DO NOT send menu again
+            # show_merge_menu is kept but NOT called here
+
         else:
             await update.message.reply_text(
                 "❌ Could not add video to queue.\n"
@@ -64,7 +78,7 @@ async def handle_merge_video_upload(update: Update, context: ContextTypes.DEFAUL
                 reply_to_message_id=update.message.message_id
             )
             file_manager.delete_file(file_path)
-    
+
     except Exception as e:
         logger.error(f"Error handling merge video upload: {e}")
         await update.message.reply_text(
