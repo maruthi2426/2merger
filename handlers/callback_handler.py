@@ -259,19 +259,19 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         logger.info(f"User {update.effective_user.id} selected Telegram upload mode")
     
     elif callback_data == "upload_rclone":
-        # If no config, ask user to upload rclone.conf file
         user_id = update.effective_user.id
         import os
         conf_path = f"./userdata/{user_id}/rclone.conf"
         
         if os.path.exists(conf_path):
-            # Config exists, set rclone mode
+            # Config exists, set rclone mode and return to main menu silently
             context.user_data["upload_mode"] = {
                 "engine": "rclone",
                 "configured": True
             }
             logger.info(f"User {user_id} selected Rclone upload mode (config found)")
             
+            # Simply return to main menu - no confirmation message
             await query.edit_message_text(
                 text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
                 reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),

@@ -11,6 +11,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def check_rclone_installed():
+    """Check if rclone is installed and accessible."""
+    try:
+        result = subprocess.run(
+            ["which", "rclone"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        return result.returncode == 0
+    except Exception as e:
+        logger.debug(f"Rclone check failed: {e}")
+        return False
+
+
 class Status:
     """Status tracking for rclone uploads."""
     Tasks = []
@@ -124,6 +139,19 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
         dict: Status with success flag and details
     """
     try:
+        if not check_rclone_installed():
+            logger.error("Rclone binary not installed on server")
+            try:
+                await status_msg.edit_text(
+                    "❌ RCLONE NOT INSTALLED\n━━━━━━━━━━━━━━━━━━\n\n"
+                    "Rclone is not available on this server.\n"
+                    "Please contact bot administrator.\n\n"
+                    "Switch to Telegram upload mode to continue."
+                )
+            except:
+                pass
+            return {"success": False, "error": "rclone not installed on server"}
+        
         # Get rclone config path from user's config
         conf_path = f"./userdata/{user_id}/rclone.conf"
         
@@ -178,7 +206,7 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
                 f"📁 Remote: {drive_name}\n"
                 f"📄 File: {filename}\n"
                 f"📊 Size: {file_size_mb:.2f}MB\n\n"
-                f"⏳ Uploading... 20%"
+                f"⏳ Uploading... 0%"
             )
         except:
             pass
@@ -242,18 +270,8 @@ async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RC
         if process.returncode == 0:
             logger.info(f"Rclone upload successful: {os.path.basename(filepath)}")
             
-            try:
-                await status_msg.edit_text(
-                    f"✅ RCLONE UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                    f"📁 Remote: {drive_name}\n"
-                    f"📄 File: {os.path.basename(filepath)}\n"
-                    f"📊 Size: {os.path.getsize(filepath)/(1024*1024):.2f}MB\n"
-                    f"📍 Path: VideoMerger/{os.path.basename(filepath)}\n\n"
-                    f"✨ Upload successful!"
-                )
-            except:
-                pass
-            
+            # Don't send confirmation message, just return success
+            # The merge processor will handle the final message
             return {
                 "success": True,
                 "remote": drive_name,
