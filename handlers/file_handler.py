@@ -66,13 +66,18 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 
                 logger.info(f"User {user_id} successfully uploaded rclone.conf")
                 
+                try:
+                    await update.message.delete()
+                except:
+                    pass
+                
                 # Get main menu keyboard which will show checkmark for rclone
                 from keyboards.main_keyboard import get_main_keyboard
                 
-                await update.message.reply_text(
-                    "🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
-                    reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
-                    reply_to_message_id=update.message.message_id
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
+                    reply_markup=get_main_keyboard(context.user_data.get("upload_mode"))
                 )
                 return
             except Exception as e:

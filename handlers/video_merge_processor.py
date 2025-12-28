@@ -338,14 +338,22 @@ async def _upload_to_rclone(context, user_id, filepath, queue, start_time, statu
         result = await rclone_driver(status_msg, user_id, filepath)
         
         if result.get("success"):
-            # Update final message with completion info
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            rclone_link = f"https://drive.google.com/drive/search?q={os.path.basename(filepath)}"
+            
+            keyboard = [[
+                InlineKeyboardButton("📂 Open in Drive", url=rclone_link)
+            ]]
+            
             try:
                 await status_msg.edit_text(
                     text=f"✅ MERGE & UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
                          f"📁 File: {os.path.basename(filepath)}\n"
                          f"☁️ Remote: {result.get('remote', 'Unknown')}\n"
                          f"📊 Size: {os.path.getsize(filepath)/(1024*1024):.2f}MB\n"
-                         f"⏱️ Total time: {int(time.time() - start_time)}s"
+                         f"⏱️ Total time: {int(time.time() - start_time)}s",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
                 )
             except:
                 pass
