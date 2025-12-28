@@ -271,8 +271,14 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             }
             logger.info(f"User {user_id} selected Rclone upload mode (config found)")
             
-            # Simply return to main menu - no confirmation message
-            await query.edit_message_text(
+            try:
+                await query.delete_message()
+            except:
+                pass
+            
+            # Send fresh main menu - no confirmation messages
+            await context.bot.send_message(
+                chat_id=user_id,
                 text="🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
                 reply_markup=get_main_keyboard(context.user_data.get("upload_mode")),
             )

@@ -340,17 +340,29 @@ async def _upload_to_rclone(context, user_id, filepath, queue, start_time, statu
         if result.get("success"):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
-            rclone_link = f"https://drive.google.com/drive/search?q={os.path.basename(filepath)}"
+            remote_name = result.get('remote', 'unknown')
+            filename = os.path.basename(filepath)
+            rclone_path = f"{remote_name}:VideoMerger/{filename}"
+            
+            # Create a web link if it's Google Drive (rclone gdrive remote)
+            if remote_name.lower() in ['gdrive', 'drive', 'google']:
+                rclone_link = f"https://drive.google.com/drive/search?q={filename}"
+                button_text = "📂 Open in Google Drive"
+            else:
+                # For other remotes, show the rclone path
+                rclone_link = f"rclone:{rclone_path}"
+                button_text = "☁️ Remote Path (Copy to use)"
             
             keyboard = [[
-                InlineKeyboardButton("📂 Open in Drive", url=rclone_link)
+                InlineKeyboardButton(button_text, url=rclone_link if rclone_link.startswith('http') else f"https://example.com")
             ]]
             
             try:
                 await status_msg.edit_text(
                     text=f"✅ MERGE & UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                         f"📁 File: {os.path.basename(filepath)}\n"
-                         f"☁️ Remote: {result.get('remote', 'Unknown')}\n"
+                         f"📁 File: {filename}\n"
+                         f"☁️ Remote: {remote_name}\n"
+                         f"📍 Path: {rclone_path}\n"
                          f"📊 Size: {os.path.getsize(filepath)/(1024*1024):.2f}MB\n"
                          f"⏱️ Total time: {int(time.time() - start_time)}s",
                     reply_markup=InlineKeyboardMarkup(keyboard)

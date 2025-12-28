@@ -67,7 +67,8 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 logger.info(f"User {user_id} successfully uploaded rclone.conf")
                 
                 try:
-                    await update.message.delete()
+                    if update.message:
+                        await update.message.delete()
                 except:
                     pass
                 
